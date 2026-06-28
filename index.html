@@ -5,10 +5,71 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Metadata Injector</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- Fallback: if styles.css fails to load, inline critical styles -->
+    <style>
+        /* Critical fallback styles */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #fafafa; color: #2c3e50; line-height: 1.6; min-height: 100vh; }
+        .app { max-width: 720px; margin: 0 auto; padding: 24px 16px; }
+        .header { text-align: center; padding: 32px 0 24px; }
+        .logo { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 8px; }
+        .logo h1 { font-size: 1.6rem; font-weight: 700; color: #2c3e50; letter-spacing: -0.5px; }
+        .tagline { color: #7f8c8d; font-size: 0.95rem; }
+        .card { background: #ffffff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); padding: 24px; margin-bottom: 16px; border: 1px solid #e8e8e8; }
+        .section-title { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+        .section-title h2 { font-size: 1.15rem; font-weight: 600; }
+        .hint { font-size: 0.82rem; color: #7f8c8d; margin-bottom: 12px; }
+        .input-group { display: flex; gap: 8px; }
+        .input-group input { flex: 1; padding: 12px 14px; border: 2px solid #e8e8e8; border-radius: 8px; font-size: 0.9rem; background: #fafafa; }
+        .input-group input:focus { outline: none; border-color: #e74c3c; }
+        .btn-icon { background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 8px; border-radius: 8px; }
+        .api-status { margin-top: 10px; font-size: 0.85rem; min-height: 20px; }
+        .api-status.ok { color: #27ae60; }
+        .api-status.error { color: #e74c3c; }
+        .dropzone { border: 2px dashed #e8e8e8; border-radius: 12px; padding: 40px 20px; text-align: center; cursor: pointer; position: relative; background: #fafafa; }
+        .dropzone:hover, .dropzone.dragover { border-color: #e74c3c; background: #fdf2f2; }
+        .dropzone-content .drop-icon { font-size: 2.5rem; display: block; margin-bottom: 12px; }
+        .dropzone-content p { color: #2c3e50; font-size: 1rem; margin-bottom: 6px; }
+        .dropzone-content .formats { font-size: 0.8rem; color: #7f8c8d; }
+        .dropzone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+        .file-list { max-height: 320px; overflow-y: auto; margin-bottom: 16px; }
+        .file-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 8px; background: #fafafa; margin-bottom: 8px; border: 1px solid #e8e8e8; }
+        .file-item .file-icon { font-size: 1.5rem; width: 40px; text-align: center; }
+        .file-item .file-info { flex: 1; min-width: 0; }
+        .file-item .file-name { font-weight: 500; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-item .file-size { font-size: 0.78rem; color: #7f8c8d; }
+        .file-item .file-remove { background: none; border: none; color: #e74c3c; font-size: 1.2rem; cursor: pointer; padding: 4px 8px; border-radius: 4px; }
+        .batch-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+        .btn-primary, .btn-secondary { padding: 12px 24px; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 8px; }
+        .btn-primary { background: #e74c3c; color: white; box-shadow: 0 2px 8px rgba(231,76,60,0.3); }
+        .btn-primary:hover { background: #c0392b; }
+        .btn-secondary { background: #fafafa; color: #2c3e50; border: 1px solid #e8e8e8; }
+        .progress-container { margin-bottom: 16px; }
+        .progress-bar { width: 100%; height: 10px; background: #e8e8e8; border-radius: 5px; overflow: hidden; margin-bottom: 10px; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #e74c3c, #ff6b6b); border-radius: 5px; transition: width 0.4s ease; width: 0%; }
+        .progress-text { font-size: 0.9rem; color: #7f8c8d; text-align: center; }
+        .processing-log { max-height: 200px; overflow-y: auto; background: #fafafa; border-radius: 8px; padding: 12px; font-size: 0.82rem; font-family: monospace; color: #7f8c8d; border: 1px solid #e8e8e8; }
+        .processing-log .log-success { color: #27ae60; }
+        .processing-log .log-error { color: #e74c3c; }
+        .processing-log .log-info { color: #e74c3c; }
+        .result-item { background: #fafafa; border-radius: 8px; padding: 16px; margin-bottom: 12px; border: 1px solid #e8e8e8; }
+        .result-item .result-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .result-item .result-name { font-weight: 600; font-size: 0.9rem; flex: 1; }
+        .result-item .result-type { font-size: 0.75rem; padding: 3px 10px; border-radius: 20px; background: #fdf2f2; color: #e74c3c; font-weight: 600; }
+        .result-item .meta-preview { background: white; border-radius: 8px; padding: 12px; margin-bottom: 10px; border: 1px solid #e8e8e8; }
+        .result-item .meta-row { display: flex; gap: 8px; margin-bottom: 6px; font-size: 0.82rem; }
+        .result-item .meta-label { font-weight: 600; color: #e74c3c; min-width: 80px; }
+        .result-item .meta-value { color: #2c3e50; flex: 1; word-break: break-word; }
+        .result-item .result-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .result-item .result-actions button { padding: 8px 16px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; border: none; }
+        .result-item .result-actions .btn-download { background: #e74c3c; color: white; }
+        .result-item .result-actions .btn-meta { background: #fafafa; color: #2c3e50; border: 1px solid #e8e8e8; }
+        .footer { text-align: center; padding: 20px 0; color: #7f8c8d; font-size: 0.8rem; }
+        @media (max-width: 480px) { .app { padding: 12px; } .logo h1 { font-size: 1.3rem; } .card { padding: 16px; } .batch-actions { flex-direction: column; } .btn-primary, .btn-secondary { width: 100%; justify-content: center; } }
+    </style>
 </head>
 <body>
     <div class="app">
-        <!-- Header -->
         <header class="header">
             <div class="logo">
                 <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
@@ -20,10 +81,9 @@
             <p class="tagline">Auto-generate SEO-optimized metadata for any file</p>
         </header>
 
-        <!-- API Key Section -->
         <section class="card api-section">
             <div class="section-title">
-                <span class="icon">🔑</span>
+                <span>🔑</span>
                 <h2>Gemini API Key</h2>
             </div>
             <p class="hint">Your key stays in your browser. Never sent to any server.</p>
@@ -34,10 +94,9 @@
             <div class="api-status" id="apiStatus"></div>
         </section>
 
-        <!-- Upload Section -->
         <section class="card upload-section">
             <div class="section-title">
-                <span class="icon">📁</span>
+                <span>📁</span>
                 <h2>Upload Files</h2>
             </div>
             <div class="dropzone" id="dropzone">
@@ -50,26 +109,21 @@
             </div>
         </section>
 
-        <!-- File List -->
         <section class="card file-list-section" id="fileListSection" style="display:none;">
             <div class="section-title">
-                <span class="icon">📋</span>
+                <span>📋</span>
                 <h2>Files Ready (<span id="fileCount">0</span>)</h2>
             </div>
             <div class="file-list" id="fileList"></div>
             <div class="batch-actions">
-                <button id="processAllBtn" class="btn-primary">
-                    <span class="btn-icon">⚡</span>
-                    Process All Files
-                </button>
+                <button id="processAllBtn" class="btn-primary">⚡ Process All Files</button>
                 <button id="clearAllBtn" class="btn-secondary">Clear All</button>
             </div>
         </section>
 
-        <!-- Processing Section -->
         <section class="card processing-section" id="processingSection" style="display:none;">
             <div class="section-title">
-                <span class="icon">🤖</span>
+                <span>🤖</span>
                 <h2>Processing with Gemini AI</h2>
             </div>
             <div class="progress-container">
@@ -81,29 +135,23 @@
             <div class="processing-log" id="processingLog"></div>
         </section>
 
-        <!-- Results Section -->
         <section class="card results-section" id="resultsSection" style="display:none;">
             <div class="section-title">
-                <span class="icon">✅</span>
+                <span>✅</span>
                 <h2>Results</h2>
             </div>
             <div class="results-list" id="resultsList"></div>
             <div class="batch-actions">
-                <button id="downloadAllBtn" class="btn-primary">
-                    <span class="btn-icon">📦</span>
-                    Download All as ZIP
-                </button>
+                <button id="downloadAllBtn" class="btn-primary">📦 Download All as ZIP</button>
                 <button id="newBatchBtn" class="btn-secondary">Start New Batch</button>
             </div>
         </section>
 
-        <!-- Footer -->
         <footer class="footer">
             <p>🔒 All processing happens in your browser. Files are never uploaded to any server.</p>
         </footer>
     </div>
 
-    <!-- JSZip for ZIP download -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script src="app.js"></script>

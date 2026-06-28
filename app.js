@@ -2,6 +2,7 @@
 // AI Metadata Injector - Client-Side App
 // ============================================
 
+// Check if CSS loaded, if not, inline styles are already in HTML
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 // Supported file types with their handling strategies
@@ -269,7 +270,19 @@ async function callGemini(prompt) {
 
     if (!response.ok) {
         const err = await response.json();
-        throw new Error(err.error?.message || 'API request failed');
+        const msg = err.error?.message || 'API request failed';
+
+        // Better error messages for common issues
+        if (msg.includes('quota') || msg.includes('limit') || msg.includes('exceeded')) {
+            throw new Error(`API Quota Exceeded: ${msg}. Please wait a minute and try again, or upgrade your Gemini API plan at https://ai.google.dev/`);
+        }
+        if (msg.includes('API key') || msg.includes('invalid') || msg.includes('not valid')) {
+            throw new Error(`Invalid API Key: ${msg}. Please check your key at https://aistudio.google.com/app/apikey`);
+        }
+        if (msg.includes('permission') || msg.includes('denied')) {
+            throw new Error(`API Permission Denied: ${msg}. Make sure the Gemini API is enabled for your key.`);
+        }
+        throw new Error(msg);
     }
 
     const data = await response.json();
