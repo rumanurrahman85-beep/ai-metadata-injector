@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Metadata Injector</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                    <circle cx="16" cy="16" r="14" stroke="#e74c3c" stroke-width="2.5"/>
+                    <path d="M10 16h12M16 10v12" stroke="#e74c3c" stroke-width="2.5" stroke-linecap="round"/>
+                </svg>
+                <h1>AI Metadata Injector</h1>
+            </div>
+            <p class="tagline">Auto-generate SEO-optimized metadata for any file</p>
+        </header>
+
+        <!-- API Key Section -->
+        <section class="card api-section">
+            <div class="section-title">
+                <span class="icon">🔑</span>
+                <h2>Gemini API Key</h2>
+            </div>
+            <p class="hint">Your key stays in your browser. Never sent to any server.</p>
+            <div class="input-group">
+                <input type="password" id="apiKey" placeholder="Paste your Gemini API key here..." autocomplete="off">
+                <button id="toggleKey" class="btn-icon" title="Show/Hide">👁️</button>
+            </div>
+            <div class="api-status" id="apiStatus"></div>
+        </section>
+
+        <!-- Upload Section -->
+        <section class="card upload-section">
+            <div class="section-title">
+                <span class="icon">📁</span>
+                <h2>Upload Files</h2>
+            </div>
+            <div class="dropzone" id="dropzone">
+                <div class="dropzone-content">
+                    <span class="drop-icon">📤</span>
+                    <p><strong>Drop files here</strong> or click to browse</p>
+                    <p class="formats">Supports: PNG, JPG, JPEG, WebP, SVG, GIF, PSD, AI, EPS, PDF, TXT, JSON, and more</p>
+                </div>
+                <input type="file" id="fileInput" multiple accept="*/*">
+            </div>
+        </section>
+
+        <!-- File List -->
+        <section class="card file-list-section" id="fileListSection" style="display:none;">
+            <div class="section-title">
+                <span class="icon">📋</span>
+                <h2>Files Ready (<span id="fileCount">0</span>)</h2>
+            </div>
+            <div class="file-list" id="fileList"></div>
+            <div class="batch-actions">
+                <button id="processAllBtn" class="btn-primary">
+                    <span class="btn-icon">⚡</span>
+                    Process All Files
+                </button>
+                <button id="clearAllBtn" class="btn-secondary">Clear All</button>
+            </div>
+        </section>
+
+        <!-- Processing Section -->
+        <section class="card processing-section" id="processingSection" style="display:none;">
+            <div class="section-title">
+                <span class="icon">🤖</span>
+                <h2>Processing with Gemini AI</h2>
+            </div>
+            <div class="progress-container">
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <p class="progress-text" id="progressText">Initializing...</p>
+            </div>
+            <div class="processing-log" id="processingLog"></div>
+        </section>
+
+        <!-- Results Section -->
+        <section class="card results-section" id="resultsSection" style="display:none;">
+            <div class="section-title">
+                <span class="icon">✅</span>
+                <h2>Results</h2>
+            </div>
+            <div class="results-list" id="resultsList"></div>
+            <div class="batch-actions">
+                <button id="downloadAllBtn" class="btn-primary">
+                    <span class="btn-icon">📦</span>
+                    Download All as ZIP
+                </button>
+                <button id="newBatchBtn" class="btn-secondary">Start New Batch</button>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>🔒 All processing happens in your browser. Files are never uploaded to any server.</p>
+        </footer>
+    </div>
+
+    <!-- JSZip for ZIP download -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
