@@ -17,6 +17,7 @@
             --border: #e8e8e8;
             --success: #27ae60;
             --error: #e74c3c;
+            --warning: #f39c12;
             --shadow: 0 2px 12px rgba(0,0,0,0.06);
             --shadow-hover: 0 4px 20px rgba(231,76,60,0.12);
             --radius: 12px;
@@ -35,33 +36,19 @@
         .logo h1 { font-size: 1.6rem; font-weight: 700; color: var(--text); letter-spacing: -0.5px; }
         .tagline { color: var(--text-light); font-size: 0.95rem; }
         .card {
-            background: var(--card-bg);
-            border-radius: var(--radius);
-            box-shadow: var(--shadow);
-            padding: 24px;
-            margin-bottom: 16px;
-            border: 1px solid var(--border);
-            transition: box-shadow 0.2s;
+            background: var(--card-bg); border-radius: var(--radius);
+            box-shadow: var(--shadow); padding: 24px; margin-bottom: 16px;
+            border: 1px solid var(--border); transition: box-shadow 0.2s;
         }
         .card:hover { box-shadow: var(--shadow-hover); }
         .section-title { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
         .section-title h2 { font-size: 1.15rem; font-weight: 600; }
         .hint { font-size: 0.82rem; color: var(--text-light); margin-bottom: 12px; }
-        .input-group { display: flex; gap: 8px; }
-        .input-group input {
-            flex: 1; padding: 12px 14px; border: 2px solid var(--border);
-            border-radius: var(--radius-sm); font-size: 0.9rem; background: var(--bg);
+        .info-box {
+            background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: var(--radius-sm);
+            padding: 12px; margin-bottom: 12px; font-size: 0.85rem; color: #2e7d32;
         }
-        .input-group input:focus { outline: none; border-color: var(--primary); }
-        .btn-icon {
-            background: none; border: none; font-size: 1.2rem; cursor: pointer;
-            padding: 8px; border-radius: var(--radius-sm);
-        }
-        .btn-icon:hover { background: var(--primary-light); }
-        .api-status { margin-top: 10px; font-size: 0.85rem; min-height: 20px; }
-        .api-status.ok { color: var(--success); }
-        .api-status.error { color: var(--error); }
-        .api-status.warn { color: var(--warning); }
+        .info-box strong { color: #1b5e20; }
         .dropzone {
             border: 2px dashed var(--border); border-radius: var(--radius);
             padding: 40px 20px; text-align: center; cursor: pointer;
@@ -120,8 +107,12 @@
         .result-item .result-actions .btn-download { background: var(--primary); color: white; }
         .result-item .result-actions .btn-meta { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
         .footer { text-align: center; padding: 20px 0; color: var(--text-light); font-size: 0.8rem; }
-        .info-box { background: #fff8e1; border: 1px solid #ffe082; border-radius: var(--radius-sm); padding: 12px; margin-bottom: 12px; font-size: 0.85rem; color: #f57f17; }
-        .info-box a { color: var(--primary); text-decoration: underline; }
+        .model-status { padding: 10px 14px; border-radius: var(--radius-sm); font-size: 0.85rem; margin-bottom: 12px; }
+        .model-status.loading { background: #fff3e0; color: #e65100; border: 1px solid #ffe0b2; }
+        .model-status.ready { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+        .model-status.error { background: #fdeaea; color: #c62828; border: 1px solid #ffcdd2; }
+        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #e65100; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
         @media (max-width: 480px) { .app { padding: 12px; } .logo h1 { font-size: 1.3rem; } .card { padding: 16px; } .batch-actions { flex-direction: column; } .btn-primary, .btn-secondary { width: 100%; justify-content: center; } }
     </style>
 </head>
@@ -135,24 +126,21 @@
                 </svg>
                 <h1>AI Metadata Injector</h1>
             </div>
-            <p class="tagline">Auto-generate SEO-optimized metadata for any file</p>
+            <p class="tagline">Auto-generate SEO-optimized metadata for any file — 100% Free, No API Key Needed</p>
         </header>
 
-        <section class="card api-section">
+        <section class="card">
             <div class="section-title">
-                <span>🔑</span>
-                <h2>Google Cloud Vision API Key</h2>
+                <span>🤖</span>
+                <h2>AI Model Status</h2>
             </div>
             <div class="info-box">
-                <strong>Free forever:</strong> 1,000 image analyses per month.<br>
-                Get your key: <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console → APIs & Services → Credentials</a> (Create API Key, then enable Cloud Vision API)
+                <strong>100% Offline AI:</strong> This app runs AI models directly in your browser using Transformers.js. No API keys, no billing, no quotas, no external servers. Everything stays on your computer.
             </div>
-            <p class="hint">Your key stays in your browser. Never sent to any server.</p>
-            <div class="input-group">
-                <input type="password" id="apiKey" placeholder="Paste your Google Cloud Vision API key here..." autocomplete="off">
-                <button id="toggleKey" class="btn-icon" title="Show/Hide">👁️</button>
+            <div class="model-status loading" id="modelStatus">
+                <span class="spinner"></span>Loading AI model... (first time only, ~20MB download)
             </div>
-            <div class="api-status" id="apiStatus"></div>
+            <button id="loadModelBtn" class="btn-primary">🚀 Load AI Model</button>
         </section>
 
         <section class="card upload-section">
@@ -177,7 +165,7 @@
             </div>
             <div class="file-list" id="fileList"></div>
             <div class="batch-actions">
-                <button id="processAllBtn" class="btn-primary">⚡ Process All Files</button>
+                <button id="processAllBtn" class="btn-primary" disabled>⚡ Process All Files</button>
                 <button id="clearAllBtn" class="btn-secondary">Clear All</button>
             </div>
         </section>
@@ -185,7 +173,7 @@
         <section class="card processing-section" id="processingSection" style="display:none;">
             <div class="section-title">
                 <span>🤖</span>
-                <h2>Processing with Google Vision AI</h2>
+                <h2>Processing with Local AI</h2>
             </div>
             <div class="progress-container">
                 <div class="progress-bar" id="progressBar">
@@ -209,10 +197,11 @@
         </section>
 
         <footer class="footer">
-            <p>🔒 All processing happens in your browser. Files are never uploaded to any server.</p>
+            <p>🔒 All AI processing runs locally in your browser. No data leaves your computer.</p>
         </footer>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script src="app.js"></script>

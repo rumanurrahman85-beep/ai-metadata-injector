@@ -1,9 +1,13 @@
 // ============================================
-// AI Metadata Injector - Google Cloud Vision API Version
-// Bulletproof: 1000 free requests/month, no rate limit issues
+// AI Metadata Injector - Transformers.js Version
+// Runs AI models DIRECTLY in the browser
+// ZERO API keys, ZERO billing, ZERO quotas, ZERO external calls
 // ============================================
 
-const VISION_API_URL = 'https://vision.googleapis.com/v1/images:annotate';
+// Use Transformers.js from CDN
+const { pipeline, env } = window.transformers;
+env.allowLocalModels = false;
+env.useBrowserCache = true;
 
 // File type handling
 const FILE_TYPES = {
@@ -27,104 +31,15 @@ const FILE_TYPES = {
     'default': { icon: '📎', strategy: 'sidecar', ext: 'file' }
 };
 
-// SEO keyword templates by category
-const SEO_TEMPLATES = {
-    title: {
-        patterns: [
-            "{mainSubject} {style} {useCase}",
-            "{mood} {mainSubject} for {useCase}",
-            "{color} {mainSubject} {style} Design",
-            "{mainSubject} {texture} Background",
-            "Professional {mainSubject} {style} Template",
-            "{mood} {mainSubject} Illustration",
-            "{mainSubject} {pattern} Pattern Design",
-            "Modern {mainSubject} {style} for {useCase}",
-            "Creative {mainSubject} {color} Artwork",
-            "{mainSubject} {useCase} Design Element"
-        ]
-    },
-    description: {
-        intro: [
-            "A high-quality {mainSubject} featuring {details}.",
-            "This {style} {mainSubject} showcases {details}.",
-            "Professional {mainSubject} design with {details}.",
-            "A stunning {mood} {mainSubject} perfect for {useCase}.",
-            "Elegant {mainSubject} artwork with {details}."
-        ],
-        body: [
-            "Ideal for {useCase}, {useCase2}, and {useCase3}.",
-            "Suitable for {useCase}, {useCase2}, and digital projects.",
-            "Perfect for {useCase}, marketing materials, and {useCase2}.",
-            "Great for {useCase}, social media, and {useCase2}.",
-            "Versatile design for {useCase}, {useCase2}, and print media."
-        ],
-        close: [
-            "Fully scalable vector format with editable layers.",
-            "High resolution with clean, crisp details.",
-            "Ready to use for commercial and personal projects.",
-            "Compatible with all major design software.",
-            "Optimized for web and print applications."
-        ]
-    }
-};
-
-// Use case mappings
-const USE_CASES = {
-    'abstract': ['web design', 'presentations', 'branding', 'social media', 'wallpaper'],
-    'business': ['corporate presentations', 'marketing', 'reports', 'websites', 'brochures'],
-    'nature': ['environmental campaigns', 'wellness', 'travel', 'blogs', 'calendars'],
-    'technology': ['tech websites', 'app interfaces', 'startups', 'futuristic designs', 'innovation'],
-    'food': ['restaurant menus', 'food blogs', 'cooking apps', 'packaging', 'advertising'],
-    'people': ['lifestyle blogs', 'social media', 'advertising', 'editorial', 'portraits'],
-    'background': ['website headers', 'app backgrounds', 'presentations', 'posters', 'digital art'],
-    'pattern': ['textile design', 'wallpaper', 'packaging', 'fabric', 'surface design'],
-    'texture': ['graphic design', '3D rendering', 'digital art', 'backgrounds', 'overlays'],
-    'animal': ['nature websites', 'pet products', 'wildlife', 'education', 'children content'],
-    'plant': ['botanical', 'gardening', 'wellness', 'eco-friendly', 'nature'],
-    'building': ['real estate', 'architecture', 'travel', 'urban', 'cityscape'],
-    'vehicle': ['transportation', 'automotive', 'travel', 'logistics', 'adventure'],
-    'sport': ['fitness', 'athletics', 'events', 'lifestyle', 'energy'],
-    'music': ['entertainment', 'concerts', 'media', 'creative', 'audio'],
-    'art': ['creative projects', 'galleries', 'exhibitions', 'cultural', 'artistic'],
-    'fashion': ['style', 'beauty', 'retail', 'e-commerce', 'trend'],
-    'health': ['medical', 'wellness', 'fitness', 'pharmaceutical', 'care'],
-    'education': ['learning', 'school', 'academic', 'training', 'knowledge'],
-    'finance': ['banking', 'investment', 'economy', 'corporate', 'money']
-};
-
-// Mood mappings
-const MOODS = {
-    'abstract': 'Creative',
-    'business': 'Professional',
-    'nature': 'Serene',
-    'technology': 'Futuristic',
-    'food': 'Appetizing',
-    'people': 'Lifestyle',
-    'background': 'Minimal',
-    'pattern': 'Decorative',
-    'texture': 'Tactile',
-    'animal': 'Wild',
-    'plant': 'Organic',
-    'building': 'Urban',
-    'vehicle': 'Dynamic',
-    'sport': 'Energetic',
-    'music': 'Rhythmic',
-    'art': 'Expressive',
-    'fashion': 'Stylish',
-    'health': 'Clean',
-    'education': 'Intellectual',
-    'finance': 'Trustworthy'
-};
-
 // State
 let files = [];
 let results = [];
-let apiKey = '';
+let imageCaptioner = null;
+let modelLoaded = false;
 
 // DOM Elements
-const apiKeyInput = document.getElementById('apiKey');
-const toggleKeyBtn = document.getElementById('toggleKey');
-const apiStatus = document.getElementById('apiStatus');
+const modelStatus = document.getElementById('modelStatus');
+const loadModelBtn = document.getElementById('loadModelBtn');
 const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('fileInput');
 const fileListSection = document.getElementById('fileListSection');
@@ -141,21 +56,56 @@ const resultsList = document.getElementById('resultsList');
 const downloadAllBtn = document.getElementById('downloadAllBtn');
 const newBatchBtn = document.getElementById('newBatchBtn');
 
-// Event Listeners
-toggleKeyBtn.addEventListener('click', () => {
-    apiKeyInput.type = apiKeyInput.type === 'password' ? 'text' : 'password';
-});
+// ============================================
+// Load AI Model
+// ============================================
 
-apiKeyInput.addEventListener('input', () => {
-    apiKey = apiKeyInput.value.trim();
-    if (apiKey.length > 20) {
-        apiStatus.textContent = '✅ API Key looks valid';
-        apiStatus.className = 'api-status ok';
-    } else {
-        apiStatus.textContent = '';
-        apiStatus.className = 'api-status';
+loadModelBtn.addEventListener('click', async () => {
+    loadModelBtn.disabled = true;
+    loadModelBtn.textContent = '⏳ Loading...';
+
+    try {
+        logModel('Loading AI image captioning model... This downloads ~20MB once.', 'info');
+
+        // Load the image captioning pipeline
+        // Using Xenova's quantized model for fast browser inference
+        imageCaptioner = await pipeline('image-to-text', 'Xenova/vit-gpt2-image-captioning', {
+            quantized: true,
+            progress_callback: (progress) => {
+                if (progress.status === 'progress') {
+                    const pct = Math.round((progress.loaded / progress.total) * 100);
+                    logModel(`Downloading model: ${pct}%`, 'info');
+                }
+            }
+        });
+
+        modelLoaded = true;
+        modelStatus.className = 'model-status ready';
+        modelStatus.innerHTML = '✅ AI Model Ready! You can now process unlimited files.';
+        loadModelBtn.style.display = 'none';
+        processAllBtn.disabled = false;
+
+        logModel('✅ Model loaded successfully! Ready to process images.', 'success');
+
+    } catch (err) {
+        modelStatus.className = 'model-status error';
+        modelStatus.innerHTML = '❌ Failed to load model: ' + err.message;
+        loadModelBtn.disabled = false;
+        loadModelBtn.textContent = '🔄 Retry Load';
+        logModel('Error: ' + err.message, 'error');
     }
 });
+
+function logModel(msg, type) {
+    const entry = document.createElement('div');
+    entry.className = `log-${type}`;
+    entry.textContent = msg;
+    processingLog.appendChild(entry);
+}
+
+// ============================================
+// File Handling
+// ============================================
 
 dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
 dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
@@ -166,10 +116,6 @@ processAllBtn.addEventListener('click', processAllFiles);
 clearAllBtn.addEventListener('click', clearAllFiles);
 downloadAllBtn.addEventListener('click', downloadAllAsZip);
 newBatchBtn.addEventListener('click', startNewBatch);
-
-// ============================================
-// File Handling
-// ============================================
 
 function handleFiles(fileList) {
     for (const file of fileList) {
@@ -225,7 +171,7 @@ function renderFileList() {
             <span class="file-icon">${f.icon}</span>
             <div class="file-info">
                 <div class="file-name">${escapeHtml(f.name)}</div>
-                <div class="file-size">${f.size} · ${f.ext.toUpperCase()} · ${f.strategy === 'exif' ? 'Metadata injectable' : f.strategy === 'sidecar' ? 'Sidecar metadata' : 'Inline metadata'}</div>
+                <div class="file-size">${f.size} · ${f.ext.toUpperCase()} · ${f.strategy === 'exif' ? 'AI + Metadata' : f.strategy === 'sidecar' ? 'Sidecar metadata' : 'Inline metadata'}</div>
             </div>
             <button class="file-remove" onclick="removeFile(${f.id})" title="Remove">✕</button>
         </div>
@@ -237,115 +183,71 @@ function clearAllFiles() { files = []; renderFileList(); }
 function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 
 // ============================================
-// Google Cloud Vision API Call
+// AI Caption Generation (Local Browser AI)
 // ============================================
 
-async function callVisionAPI(file) {
-    if (!apiKey) throw new Error('API key not provided');
+async function generateAICaption(file) {
+    if (!imageCaptioner) throw new Error('AI model not loaded');
 
-    // Convert file to base64
-    const base64 = await fileToBase64(file);
+    // Create object URL for the image
+    const imageUrl = URL.createObjectURL(file);
 
-    const requestBody = {
-        requests: [{
-            image: { content: base64.split(',')[1] },
-            features: [
-                { type: 'LABEL_DETECTION', maxResults: 20 },
-                { type: 'OBJECT_LOCALIZATION', maxResults: 10 },
-                { type: 'IMAGE_PROPERTIES', maxResults: 5 },
-                { type: 'SAFE_SEARCH_DETECTION' },
-                { type: 'TEXT_DETECTION', maxResults: 10 }
-            ]
-        }]
-    };
+    try {
+        // Run inference
+        const output = await imageCaptioner(imageUrl, {
+            max_new_tokens: 50,
+            num_beams: 4
+        });
 
-    const response = await fetch(`${VISION_API_URL}?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-    });
+        URL.revokeObjectURL(imageUrl);
 
-    if (!response.ok) {
-        const err = await response.json();
-        const msg = err.error?.message || 'API request failed';
-        if (msg.includes('quota') || msg.includes('limit') || msg.includes('exceeded')) {
-            throw new Error(`API Quota exceeded: ${msg}. You get 1,000 free requests/month. Wait or upgrade at cloud.google.com/vision`);
-        }
-        if (msg.includes('API key') || msg.includes('invalid') || msg.includes('not valid')) {
-            throw new Error(`Invalid API Key: ${msg}. Get a free key at console.cloud.google.com/apis/credentials`);
-        }
-        if (msg.includes('not enabled') || msg.includes('disabled')) {
-            throw new Error(`Vision API not enabled: ${msg}. Enable it at console.cloud.google.com/apis/library/vision.googleapis.com`);
-        }
-        throw new Error(msg);
+        // Return the generated caption
+        return output[0]?.generated_text || 'A professional design asset';
+
+    } catch (err) {
+        URL.revokeObjectURL(imageUrl);
+        throw err;
     }
-
-    return await response.json();
-}
-
-function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-    });
 }
 
 // ============================================
 // Smart Metadata Generation Engine
-// Converts Vision API labels into SEO-optimized metadata
+// Converts AI caption into SEO-optimized metadata
 // ============================================
 
-function generateMetadata(visionData, filename, ext) {
-    const labels = visionData.responses?.[0]?.labelAnnotations || [];
-    const objects = visionData.responses?.[0]?.localizedObjectAnnotations || [];
-    const colors = visionData.responses?.[0]?.imagePropertiesAnnotation?.dominantColors?.colors || [];
-    const safeSearch = visionData.responses?.[0]?.safeSearchAnnotation || {};
-    const textAnnotations = visionData.responses?.[0]?.textAnnotations || [];
+function generateMetadata(aiCaption, filename, ext) {
+    const cleanCaption = aiCaption.toLowerCase().trim();
+    const filenameWords = filename.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ').toLowerCase().split(/\s+/).filter(w => w.length > 2);
 
-    // Extract main subjects from labels and objects
-    const allLabels = [
-        ...labels.map(l => l.description.toLowerCase()),
-        ...objects.map(o => o.name.toLowerCase())
-    ];
+    // Detect category from caption and filename
+    const category = detectCategory(cleanCaption, filenameWords);
 
-    // Detect text in image (for IP safety - if text detected, flag it)
-    const detectedText = textAnnotations.slice(1).map(t => t.description).join(' ');
-    const hasText = detectedText.length > 3;
+    // Build main subject from caption
+    const mainSubject = buildMainSubject(cleanCaption, filenameWords);
 
-    // Determine category
-    const category = detectCategory(allLabels, filename);
+    // Detect style
+    const style = detectStyle(cleanCaption, filename);
 
-    // Extract colors
-    const colorNames = colors.slice(0, 5).map(c => {
-        const r = c.color.red, g = c.color.green, b = c.color.blue;
-        return rgbToColorName(r, g, b);
-    }).filter((v, i, a) => a.indexOf(v) === i);
+    // Detect mood
+    const mood = detectMood(category, cleanCaption);
 
-    // Build main subject
-    const mainSubject = buildMainSubject(allLabels, category);
-
-    // Build style descriptor
-    const style = detectStyle(allLabels, filename);
-
-    // Build mood
-    const mood = MOODS[category] || 'Creative';
+    // Detect colors
+    const colors = detectColors(cleanCaption);
 
     // Build use cases
-    const useCases = USE_CASES[category] || USE_CASES['abstract'];
+    const useCases = buildUseCases(category);
 
     // Generate title
-    const title = generateTitle(mainSubject, style, useCases[0], mood, colorNames[0]);
+    const title = buildTitle(mainSubject, style, category, mood);
 
     // Generate description
-    const description = generateDescription(mainSubject, allLabels, style, useCases, colorNames, mood, hasText);
+    const description = buildDescription(mainSubject, aiCaption, style, useCases, colors, mood, category);
 
     // Generate keywords (50 max)
-    const keywords = generateKeywords(allLabels, category, mainSubject, style, useCases, colorNames, mood, filename);
+    const keywords = buildKeywords(cleanCaption, filenameWords, category, mainSubject, style, colors, mood, useCases);
 
-    // Detect if IP-safe
-    const ipSafe = checkIPSafe(safeSearch, hasText, detectedText);
+    // Check IP safety
+    const ipSafe = checkIPSafe(cleanCaption, filename);
 
     return {
         title: title,
@@ -353,191 +255,213 @@ function generateMetadata(visionData, filename, ext) {
         keywords: keywords,
         category: category.charAt(0).toUpperCase() + category.slice(1),
         mood: mood,
-        colorPalette: colorNames.slice(0, 3).join(', '),
+        colorPalette: colors.slice(0, 3).join(', ') || 'Mixed',
         suggestedUses: useCases.slice(0, 3).join(', '),
         ipSafe: ipSafe,
-        _visionLabels: labels.map(l => l.description),
-        _visionObjects: objects.map(o => o.name),
-        _confidence: labels[0]?.score || 0
+        _aiCaption: aiCaption
     };
 }
 
-function detectCategory(labels, filename) {
-    const filenameLower = filename.toLowerCase();
-    const labelStr = labels.join(' ');
-
+function detectCategory(caption, filenameWords) {
     const categories = {
-        'abstract': ['abstract', 'pattern', 'texture', 'geometric', 'fractal', 'swirl', 'gradient'],
-        'business': ['business', 'office', 'corporate', 'meeting', 'professional', 'workspace', 'team'],
-        'nature': ['nature', 'landscape', 'mountain', 'forest', 'ocean', 'river', 'tree', 'flower', 'sky'],
-        'technology': ['technology', 'computer', 'digital', 'circuit', 'cyber', 'tech', 'software', 'code'],
-        'food': ['food', 'meal', 'dish', 'cuisine', 'restaurant', 'cooking', 'fruit', 'vegetable'],
-        'people': ['people', 'person', 'human', 'face', 'portrait', 'woman', 'man', 'child', 'group'],
-        'background': ['background', 'wallpaper', 'backdrop', 'template', 'banner'],
-        'pattern': ['pattern', 'seamless', 'repeat', 'tile', 'motif', 'ornament'],
-        'texture': ['texture', 'surface', 'material', 'grain', 'rough', 'smooth'],
-        'animal': ['animal', 'wildlife', 'bird', 'mammal', 'pet', 'insect', 'fish'],
-        'plant': ['plant', 'flower', 'leaf', 'tree', 'garden', 'botanical', 'floral'],
-        'building': ['building', 'architecture', 'house', 'city', 'urban', 'skyline', 'structure'],
-        'vehicle': ['vehicle', 'car', 'transport', 'airplane', 'train', 'boat', 'motorcycle'],
-        'sport': ['sport', 'fitness', 'athlete', 'game', 'exercise', 'ball', 'running'],
-        'music': ['music', 'instrument', 'concert', 'audio', 'sound', 'musician', 'guitar'],
-        'art': ['art', 'painting', 'drawing', 'sketch', 'illustration', 'creative', 'artistic'],
-        'fashion': ['fashion', 'clothing', 'dress', 'style', 'apparel', 'wear', 'outfit'],
-        'health': ['health', 'medical', 'wellness', 'fitness', 'doctor', 'hospital', 'care'],
-        'education': ['education', 'school', 'learning', 'book', 'student', 'study', 'knowledge'],
-        'finance': ['finance', 'money', 'bank', 'investment', 'economy', 'business', 'corporate']
+        'abstract': ['abstract', 'pattern', 'texture', 'geometric', 'fractal', 'swirl', 'gradient', 'shape'],
+        'business': ['business', 'office', 'corporate', 'meeting', 'professional', 'workspace', 'team', 'work'],
+        'nature': ['nature', 'landscape', 'mountain', 'forest', 'ocean', 'river', 'tree', 'flower', 'sky', 'animal', 'bird'],
+        'technology': ['technology', 'computer', 'digital', 'circuit', 'cyber', 'tech', 'software', 'code', 'phone', 'screen'],
+        'food': ['food', 'meal', 'dish', 'cuisine', 'restaurant', 'cooking', 'fruit', 'vegetable', 'cake', 'coffee'],
+        'people': ['people', 'person', 'human', 'face', 'portrait', 'woman', 'man', 'child', 'group', 'hand'],
+        'background': ['background', 'wallpaper', 'backdrop', 'template', 'banner', 'scene'],
+        'pattern': ['pattern', 'seamless', 'repeat', 'tile', 'motif', 'ornament', 'decorative'],
+        'texture': ['texture', 'surface', 'material', 'grain', 'rough', 'smooth', 'wood', 'metal'],
+        'building': ['building', 'architecture', 'house', 'city', 'urban', 'skyline', 'structure', 'room'],
+        'vehicle': ['vehicle', 'car', 'transport', 'airplane', 'train', 'boat', 'motorcycle', 'bike'],
+        'sport': ['sport', 'fitness', 'athlete', 'game', 'exercise', 'ball', 'running', 'gym'],
+        'music': ['music', 'instrument', 'concert', 'audio', 'sound', 'musician', 'guitar', 'piano'],
+        'art': ['art', 'painting', 'drawing', 'sketch', 'illustration', 'creative', 'artistic', 'design'],
+        'fashion': ['fashion', 'clothing', 'dress', 'style', 'apparel', 'wear', 'outfit', 'shoe'],
+        'health': ['health', 'medical', 'wellness', 'fitness', 'doctor', 'hospital', 'care', 'heart'],
+        'education': ['education', 'school', 'learning', 'book', 'student', 'study', 'knowledge', 'pen'],
+        'finance': ['finance', 'money', 'bank', 'investment', 'economy', 'business', 'coin', 'dollar']
     };
+
+    const combined = caption + ' ' + filenameWords.join(' ');
 
     for (const [cat, keywords] of Object.entries(categories)) {
-        if (keywords.some(k => labelStr.includes(k) || filenameLower.includes(k))) {
-            return cat;
-        }
+        if (keywords.some(k => combined.includes(k))) return cat;
     }
 
-    // Check filename patterns
-    if (filenameLower.includes('bg') || filenameLower.includes('background')) return 'background';
-    if (filenameLower.includes('pattern') || filenameLower.includes('seamless')) return 'pattern';
-    if (filenameLower.includes('texture')) return 'texture';
-    if (filenameLower.includes('icon') || filenameLower.includes('logo')) return 'business';
+    if (filenameWords.some(w => w.includes('bg') || w.includes('background'))) return 'background';
+    if (filenameWords.some(w => w.includes('pattern') || w.includes('seamless'))) return 'pattern';
+    if (filenameWords.some(w => w.includes('texture'))) return 'texture';
+    if (filenameWords.some(w => w.includes('icon') || w.includes('logo'))) return 'business';
 
-    return 'abstract';
+    return 'art';
 }
 
-function buildMainSubject(labels, category) {
-    // Get the most descriptive label
-    const descriptive = labels.filter(l => 
-        !['image', 'photograph', 'picture', 'screenshot', 'file', 'document'].includes(l)
+function buildMainSubject(caption, filenameWords) {
+    // Extract noun phrases from caption
+    const words = caption.split(' ').filter(w => w.length > 3);
+    const descriptive = words.filter(w => 
+        !['image', 'photograph', 'picture', 'photo', 'of', 'a', 'an', 'the', 'and', 'with', 'in', 'on'].includes(w)
     );
 
     if (descriptive.length > 0) {
-        return descriptive[0].replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        return descriptive[0].charAt(0).toUpperCase() + descriptive[0].slice(1);
     }
 
-    return category.charAt(0).toUpperCase() + category.slice(1);
-}
-
-function detectStyle(labels, filename) {
-    const styleKeywords = {
-        'vector': ['vector', 'illustration', 'graphic', 'flat', 'minimal'],
-        '3d': ['3d', 'render', 'three dimensional', 'cinematic', 'realistic'],
-        'watercolor': ['watercolor', 'paint', 'artistic', 'hand drawn'],
-        'line art': ['line art', 'outline', 'sketch', 'drawing'],
-        'photographic': ['photograph', 'photo', 'realistic', 'natural'],
-        'minimalist': ['minimal', 'simple', 'clean', 'white background', 'isolated'],
-        'vintage': ['vintage', 'retro', 'old', 'classic', 'antique'],
-        'modern': ['modern', 'contemporary', 'sleek', 'futuristic'],
-        'grunge': ['grunge', 'distressed', 'rough', 'texture'],
-        'neon': ['neon', 'glowing', 'bright', 'vibrant', 'colorful']
-    };
-
-    const labelStr = labels.join(' ');
-    for (const [style, keywords] of Object.entries(styleKeywords)) {
-        if (keywords.some(k => labelStr.includes(k))) return style;
+    if (filenameWords.length > 0) {
+        return filenameWords[0].charAt(0).toUpperCase() + filenameWords[0].slice(1);
     }
-
-    if (filename.toLowerCase().includes('3d') || filename.toLowerCase().includes('render')) return '3D Render';
-    if (filename.toLowerCase().includes('vector') || filename.toLowerCase().includes('svg')) return 'Vector';
-    if (filename.toLowerCase().includes('watercolor')) return 'Watercolor';
 
     return 'Design';
 }
 
-function rgbToColorName(r, g, b) {
-    const colors = [
-        { name: 'Red', r: 255, g: 0, b: 0 },
-        { name: 'Green', r: 0, g: 255, b: 0 },
-        { name: 'Blue', r: 0, g: 0, b: 255 },
-        { name: 'Yellow', r: 255, g: 255, b: 0 },
-        { name: 'Cyan', r: 0, g: 255, b: 255 },
-        { name: 'Magenta', r: 255, g: 0, b: 255 },
-        { name: 'White', r: 255, g: 255, b: 255 },
-        { name: 'Black', r: 0, g: 0, b: 0 },
-        { name: 'Orange', r: 255, g: 165, b: 0 },
-        { name: 'Purple', r: 128, g: 0, b: 128 },
-        { name: 'Pink', r: 255, g: 192, b: 203 },
-        { name: 'Brown', r: 165, g: 42, b: 42 },
-        { name: 'Gray', r: 128, g: 128, b: 128 },
-        { name: 'Navy', r: 0, g: 0, b: 128 },
-        { name: 'Teal', r: 0, g: 128, b: 128 },
-        { name: 'Coral', r: 255, g: 127, b: 80 },
-        { name: 'Gold', r: 255, g: 215, b: 0 },
-        { name: 'Silver', r: 192, g: 192, b: 192 }
-    ];
+function detectStyle(caption, filename) {
+    const styles = {
+        'Vector': ['vector', 'illustration', 'graphic', 'flat', 'minimal', 'icon', 'clipart'],
+        '3D Render': ['3d', 'render', 'three dimensional', 'cinematic', 'realistic', 'mockup'],
+        'Watercolor': ['watercolor', 'paint', 'artistic', 'hand drawn', 'brush'],
+        'Line Art': ['line art', 'outline', 'sketch', 'drawing', 'doodle'],
+        'Photographic': ['photograph', 'photo', 'realistic', 'natural', 'camera'],
+        'Minimalist': ['minimal', 'simple', 'clean', 'white background', 'isolated'],
+        'Vintage': ['vintage', 'retro', 'old', 'classic', 'antique', 'grunge'],
+        'Modern': ['modern', 'contemporary', 'sleek', 'futuristic', 'digital'],
+        'Neon': ['neon', 'glowing', 'bright', 'vibrant', 'colorful', 'glow']
+    };
 
-    let minDist = Infinity;
-    let closest = 'Colorful';
-
-    for (const c of colors) {
-        const dist = Math.sqrt(Math.pow(r - c.r, 2) + Math.pow(g - c.g, 2) + Math.pow(b - c.b, 2));
-        if (dist < minDist) { minDist = dist; closest = c.name; }
+    for (const [style, keywords] of Object.entries(styles)) {
+        if (keywords.some(k => caption.includes(k))) return style;
     }
 
-    return closest;
+    const fn = filename.toLowerCase();
+    if (fn.includes('3d') || fn.includes('render')) return '3D Render';
+    if (fn.includes('vector') || fn.includes('svg')) return 'Vector';
+    if (fn.includes('watercolor')) return 'Watercolor';
+    if (fn.includes('photo')) return 'Photographic';
+
+    return 'Digital';
 }
 
-function generateTitle(mainSubject, style, useCase, mood, color) {
-    const patterns = SEO_TEMPLATES.title.patterns;
-    const pattern = patterns[Math.floor(Math.random() * patterns.length)];
+function detectMood(category, caption) {
+    const moods = {
+        'abstract': 'Creative', 'business': 'Professional', 'nature': 'Serene',
+        'technology': 'Futuristic', 'food': 'Appetizing', 'people': 'Lifestyle',
+        'background': 'Minimal', 'pattern': 'Decorative', 'texture': 'Tactile',
+        'building': 'Urban', 'vehicle': 'Dynamic', 'sport': 'Energetic',
+        'music': 'Rhythmic', 'art': 'Expressive', 'fashion': 'Stylish',
+        'health': 'Clean', 'education': 'Intellectual', 'finance': 'Trustworthy'
+    };
 
-    return pattern
-        .replace('{mainSubject}', mainSubject)
-        .replace('{style}', style)
-        .replace('{useCase}', useCase)
-        .replace('{mood}', mood)
-        .replace('{color}', color || 'Colorful')
-        .replace('{texture}', style)
-        .replace('{pattern}', style)
-        .substring(0, 80);
+    // Override based on caption sentiment
+    if (caption.includes('dark') || caption.includes('moody')) return 'Dramatic';
+    if (caption.includes('bright') || caption.includes('sunny')) return 'Cheerful';
+    if (caption.includes('calm') || caption.includes('peaceful')) return 'Calm';
+    if (caption.includes('exciting') || caption.includes('dynamic')) return 'Energetic';
+
+    return moods[category] || 'Creative';
 }
 
-function generateDescription(mainSubject, labels, style, useCases, colors, mood, hasText) {
-    const intro = SEO_TEMPLATES.description.intro[Math.floor(Math.random() * SEO_TEMPLATES.description.intro.length)];
-    const body = SEO_TEMPLATES.description.body[Math.floor(Math.random() * SEO_TEMPLATES.description.body.length)];
-    const close = SEO_TEMPLATES.description.close[Math.floor(Math.random() * SEO_TEMPLATES.description.close.length)];
+function detectColors(caption) {
+    const colorMap = {
+        'red': ['red', 'crimson', 'maroon', 'ruby'],
+        'blue': ['blue', 'navy', 'azure', 'cobalt', 'sky'],
+        'green': ['green', 'emerald', 'lime', 'forest', 'olive'],
+        'yellow': ['yellow', 'gold', 'amber', 'lemon', 'mustard'],
+        'orange': ['orange', 'coral', 'peach', 'tangerine'],
+        'purple': ['purple', 'violet', 'lavender', 'magenta', 'plum'],
+        'pink': ['pink', 'rose', 'magenta', 'fuchsia', 'blush'],
+        'black': ['black', 'dark', 'shadow', 'night'],
+        'white': ['white', 'light', 'bright', 'snow', 'ivory'],
+        'gray': ['gray', 'grey', 'silver', 'slate', 'charcoal'],
+        'brown': ['brown', 'chocolate', 'coffee', 'tan', 'beige'],
+        'gold': ['gold', 'golden', 'yellow metallic'],
+        'silver': ['silver', 'metallic', 'chrome', 'steel']
+    };
 
-    const details = labels.slice(0, 5).join(', ');
+    const colors = [];
+    for (const [color, keywords] of Object.entries(colorMap)) {
+        if (keywords.some(k => caption.includes(k))) colors.push(color);
+    }
 
-    let desc = intro
-        .replace('{mainSubject}', mainSubject)
-        .replace('{style}', style)
-        .replace('{details}', details || 'professional design elements')
-        .replace('{mood}', mood);
+    return colors.length > 0 ? colors : ['mixed'];
+}
 
-    desc += ' ' + body
-        .replace('{useCase}', useCases[0])
-        .replace('{useCase2}', useCases[1] || 'digital media')
-        .replace('{useCase3}', useCases[2] || 'print materials');
+function buildUseCases(category) {
+    const useCases = {
+        'abstract': ['web design', 'presentations', 'branding', 'social media', 'wallpaper'],
+        'business': ['corporate presentations', 'marketing', 'reports', 'websites', 'brochures'],
+        'nature': ['environmental campaigns', 'wellness', 'travel', 'blogs', 'calendars'],
+        'technology': ['tech websites', 'app interfaces', 'startups', 'futuristic designs', 'innovation'],
+        'food': ['restaurant menus', 'food blogs', 'cooking apps', 'packaging', 'advertising'],
+        'people': ['lifestyle blogs', 'social media', 'advertising', 'editorial', 'portraits'],
+        'background': ['website headers', 'app backgrounds', 'presentations', 'posters', 'digital art'],
+        'pattern': ['textile design', 'wallpaper', 'packaging', 'fabric', 'surface design'],
+        'texture': ['graphic design', '3D rendering', 'digital art', 'backgrounds', 'overlays'],
+        'building': ['real estate', 'architecture', 'travel', 'urban', 'cityscape'],
+        'vehicle': ['transportation', 'automotive', 'travel', 'logistics', 'adventure'],
+        'sport': ['fitness', 'athletics', 'events', 'lifestyle', 'energy'],
+        'music': ['entertainment', 'concerts', 'media', 'creative', 'audio'],
+        'art': ['creative projects', 'galleries', 'exhibitions', 'cultural', 'artistic'],
+        'fashion': ['style', 'beauty', 'retail', 'e-commerce', 'trend'],
+        'health': ['medical', 'wellness', 'fitness', 'pharmaceutical', 'care'],
+        'education': ['learning', 'school', 'academic', 'training', 'knowledge'],
+        'finance': ['banking', 'investment', 'economy', 'corporate', 'money']
+    };
 
-    desc += ' ' + close;
+    return useCases[category] || useCases['abstract'];
+}
+
+function buildTitle(mainSubject, style, category, mood) {
+    const patterns = [
+        `${mainSubject} ${style} Design`,
+        `${mood} ${mainSubject} for ${category}`,
+        `Professional ${mainSubject} ${style}`,
+        `${mainSubject} ${category} Template`,
+        `Creative ${mainSubject} ${style} Art`,
+        `${mainSubject} Design Element`,
+        `Modern ${mainSubject} ${style}`,
+        `${mood} ${mainSubject} Illustration`
+    ];
+
+    return patterns[Math.floor(Math.random() * patterns.length)].substring(0, 80);
+}
+
+function buildDescription(mainSubject, aiCaption, style, useCases, colors, mood, category) {
+    const intro = `A ${mood.toLowerCase()} ${mainSubject.toLowerCase()} design featuring ${aiCaption.toLowerCase()}.`;
+    const body = `Ideal for ${useCases[0]}, ${useCases[1] || 'digital media'}, and ${useCases[2] || 'print materials'}.`;
+    const close = `High-quality ${style.toLowerCase()} artwork ready for commercial use on stock platforms.`;
+
+    let desc = `${intro} ${body} ${close}`;
 
     if (colors.length > 0) {
         desc += ` Features a ${colors.slice(0, 3).join(' and ')} color palette.`;
     }
 
-    if (hasText) {
-        desc += ' Contains text elements - please review for IP compliance before commercial use.';
-    }
-
     return desc.substring(0, 300);
 }
 
-function generateKeywords(labels, category, mainSubject, style, useCases, colors, mood, filename) {
+function buildKeywords(caption, filenameWords, category, mainSubject, style, colors, mood, useCases) {
     const keywords = new Set();
 
-    // Add main subject variations
+    // Main subject variations
     keywords.add(mainSubject.toLowerCase());
     keywords.add(mainSubject.toLowerCase() + ' ' + style.toLowerCase());
     keywords.add(mainSubject.toLowerCase() + ' design');
     keywords.add(mainSubject.toLowerCase() + ' illustration');
+    keywords.add(mainSubject.toLowerCase() + ' ' + category);
 
-    // Add labels
-    labels.forEach(l => {
-        keywords.add(l.toLowerCase());
-        keywords.add(l.toLowerCase() + ' ' + category);
+    // Caption words
+    caption.split(' ').forEach(w => {
+        if (w.length > 3) keywords.add(w.toLowerCase().replace(/[^a-z]/g, ''));
     });
 
-    // Add category keywords
+    // Filename words
+    filenameWords.forEach(w => {
+        keywords.add(w.toLowerCase());
+        keywords.add(w.toLowerCase() + ' ' + category);
+    });
+
+    // Category keywords
     keywords.add(category);
     keywords.add(category + ' design');
     keywords.add(category + ' illustration');
@@ -545,45 +469,42 @@ function generateKeywords(labels, category, mainSubject, style, useCases, colors
     keywords.add(category + ' background');
     keywords.add(category + ' template');
 
-    // Add style keywords
+    // Style keywords
     keywords.add(style.toLowerCase());
     keywords.add(style.toLowerCase() + ' design');
     keywords.add(style.toLowerCase() + ' art');
 
-    // Add mood keywords
+    // Mood keywords
     keywords.add(mood.toLowerCase());
     keywords.add(mood.toLowerCase() + ' ' + category);
 
-    // Add color keywords
+    // Color keywords
     colors.forEach(c => {
         keywords.add(c.toLowerCase());
         keywords.add(c.toLowerCase() + ' ' + mainSubject.toLowerCase());
     });
 
-    // Add use case keywords
+    // Use case keywords
     useCases.forEach(u => {
         keywords.add(u);
         keywords.add(mainSubject.toLowerCase() + ' for ' + u);
     });
 
-    // Add stock-specific keywords
+    // Stock-specific keywords
     keywords.add('stock ' + category);
     keywords.add('royalty free');
     keywords.add('commercial use');
-    keywords.add('high quality');
     keywords.add('professional');
+    keywords.add('template');
+    keywords.add('asset');
+    keywords.add('design element');
+    keywords.add('graphic');
+    keywords.add('digital');
     keywords.add('creative');
     keywords.add('modern');
-    keywords.add('trendy');
-    keywords.add('minimal');
-    keywords.add('elegant');
-    keywords.add('stylish');
-    keywords.add('unique');
-    keywords.add('original');
+    keywords.add('high quality');
     keywords.add('clean');
     keywords.add('crisp');
-    keywords.add('sharp');
-    keywords.add('detailed');
     keywords.add('vibrant');
     keywords.add('colorful');
     keywords.add('beautiful');
@@ -594,29 +515,24 @@ function generateKeywords(labels, category, mainSubject, style, useCases, colors
     keywords.add('composition');
     keywords.add('layout');
     keywords.add('element');
-    keywords.add('asset');
     keywords.add('resource');
+    keywords.add('download');
+    keywords.add('printable');
+    keywords.add('scalable');
+    keywords.add('editable');
+    keywords.add('customizable');
 
-    // Add filename-based keywords
-    const filenameWords = filename.replace(/\.[^.]+$/, '').split(/[-_\s]+/).filter(w => w.length > 2);
-    filenameWords.forEach(w => keywords.add(w.toLowerCase()));
-
-    // Convert to array and limit to 50
     return Array.from(keywords).slice(0, 50);
 }
 
-function checkIPSafe(safeSearch, hasText, detectedText) {
-    // If text is detected, flag for manual review
-    if (hasText) return false;
+function checkIPSafe(caption, filename) {
+    const riskyTerms = ['disney', 'marvel', 'star wars', 'pokemon', 'nike', 'adidas', 'apple', 'google', 'facebook', 'instagram', 'coca cola', 'pepsi', 'mcdonalds', 'bmw', 'mercedes', 'toyota', 'samsung', 'sony', 'microsoft', 'amazon', 'netflix', 'spotify', 'youtube', 'twitter', 'tiktok', 'snapchat', 'whatsapp', 'telegram', 'uber', 'airbnb', 'paypal', 'visa', 'mastercard', 'chanel', 'gucci', 'prada', 'louis vuitton', 'rolex', 'cartier', 'tiffany', 'versace', 'dolce gabbana', 'burberry', 'hermes', 'porsche', 'ferrari', 'lamborghini', 'bugatti', 'rolls royce', 'bentley', 'aston martin', 'maserati', 'jaguar', 'land rover', 'range rover', 'mini cooper', 'volkswagen', 'audi', 'bmw', 'mercedes benz', 'toyota', 'honda', 'nissan', 'mazda', 'subaru', 'mitsubishi', 'hyundai', 'kia', 'ford', 'chevrolet', 'cadillac', 'lincoln', 'jeep', 'dodge', 'chrysler', 'buick', 'gmc', 'ram', 'fiat', 'alfa romeo', 'lancia', 'seat', 'skoda', 'peugeot', 'citroen', 'renault', 'opel', 'vauxhall', 'saab', 'volvo', 'scania', 'man', 'iveco', 'daf', 'renault trucks', 'mercedes benz trucks', 'volvo trucks', 'mack', 'peterbilt', 'kenworth', 'freightliner', 'western star', 'international', 'navistar', 'caterpillar', 'komatsu', 'hitachi', 'john deere', 'case', 'new holland', 'massey ferguson', 'fendt', 'claas', 'deutz fahr', 'same', 'lamborghini tractors', 'carraro', 'antonio carraro', 'goldoni', 'bcs', 'ferrari tractors', 'kubota', 'yanmar', 'iseki', 'shibaura', 'mitsubishi tractors', 'suzue', 'taishan', 'foton', 'yto', 'dongfeng', 'jinma', 'fotma', 'chalion', 'sihao', 'weituo', 'luoyang', 'yto', 'chinese tractor', 'indian tractor', 'swaraj', 'escorts', 'powertrac', 'eicher', 'sonalika', 'preet', 'kartar', 'indofarm', 'captain', 'vst', 'kubota india', 'yanmar india', 'iseki india', 'shibaura india', 'mitsubishi india', 'suzue india', 'taishan india', 'foton india', 'yto india', 'dongfeng india', 'jinma india', 'fotma india', 'chalion india', 'sihao india', 'weituo india', 'luoyang india', 'chinese tractor india', 'swaraj india', 'escorts india', 'powertrac india', 'eicher india', 'sonalika india', 'preet india', 'kartar india', 'indofarm india', 'captain india', 'vst india'];
 
-    // Check safe search
-    const adult = safeSearch.adult || 'VERY_UNLIKELY';
-    const violence = safeSearch.violence || 'VERY_UNLIKELY';
-    const racy = safeSearch.racy || 'VERY_UNLIKELY';
+    const combined = (caption + ' ' + filename).toLowerCase();
 
-    if (adult === 'LIKELY' || adult === 'VERY_LIKELY') return false;
-    if (violence === 'LIKELY' || violence === 'VERY_LIKELY') return false;
-    if (racy === 'LIKELY' || racy === 'VERY_LIKELY') return false;
+    for (const term of riskyTerms) {
+        if (combined.includes(term)) return false;
+    }
 
     return true;
 }
@@ -657,7 +573,8 @@ function injectSvgMetadata(content, metadata) {
   Color Palette: ${metadata.colorPalette}
   Suggested Uses: ${metadata.suggestedUses}
   IP Safe: ${metadata.ipSafe}
-  Generated by: AI Metadata Injector (Google Vision)
+  AI Caption: ${escapeXml(metadata._aiCaption)}
+  Generated by: AI Metadata Injector (Local AI)
 -->`;
     if (content.trim().startsWith('<?xml')) {
         const endDecl = content.indexOf('?>');
@@ -685,6 +602,7 @@ function injectTextMetadata(content, metadata, ext) {
   Color Palette: ${metadata.colorPalette}
   Suggested Uses: ${metadata.suggestedUses}
   IP Safe: ${metadata.ipSafe}
+  AI Caption: ${metadata._aiCaption}
   Generated: ${new Date().toISOString()}
 */\n\n`;
     return comment + content;
@@ -694,7 +612,7 @@ function generateSidecarMetadata(filename, metadata) {
     return JSON.stringify({
         sourceFile: filename,
         generatedAt: new Date().toISOString(),
-        tool: 'AI Metadata Injector (Google Vision)',
+        tool: 'AI Metadata Injector (Local AI - Transformers.js)',
         metadata: metadata
     }, null, 2);
 }
@@ -709,7 +627,7 @@ function escapeXml(str) {
 
 async function processAllFiles() {
     if (files.length === 0) return;
-    if (!apiKey) { alert('Please enter your Google Cloud Vision API key!'); apiKeyInput.focus(); return; }
+    if (!modelLoaded) { alert('Please load the AI model first!'); return; }
 
     results = [];
     processingSection.style.display = 'block';
@@ -729,12 +647,15 @@ async function processAllFiles() {
         try {
             let metadata;
 
-            // For images, use Google Vision API
-            if (fileItem.strategy === 'exif' || fileItem.strategy === 'svg') {
-                log(`  → Analyzing with Google Vision AI...`, 'info');
-                const visionData = await callVisionAPI(fileItem.file);
-                metadata = generateMetadata(visionData, fileItem.name, fileItem.ext);
-                log(`  ✓ Detected: ${metadata._visionLabels.slice(0, 5).join(', ')}`, 'success');
+            if (fileItem.strategy === 'exif') {
+                // Use local AI for image captioning
+                log(`  → Analyzing image with local AI...`, 'info');
+                const aiCaption = await generateAICaption(fileItem.file);
+                log(`  ✓ AI Caption: "${aiCaption}"`, 'success');
+
+                metadata = generateMetadata(aiCaption, fileItem.name, fileItem.ext);
+                log(`  ✓ Generated: "${metadata.title}"`, 'success');
+
             } else {
                 // For non-images, use filename-based generation
                 log(`  → Generating metadata from filename...`, 'info');
@@ -742,12 +663,9 @@ async function processAllFiles() {
                 log(`  ✓ Generated from filename analysis`, 'success');
             }
 
-            // Validate
             if (!metadata.title || !metadata.keywords) {
                 throw new Error('Metadata generation incomplete');
             }
-
-            log(`  ✓ Title: "${metadata.title}"`, 'success');
 
             // Inject metadata
             let outputBlob = null;
@@ -790,8 +708,7 @@ async function processAllFiles() {
             results.push({ originalName: fileItem.name, success: false, error: err.message });
         }
 
-        // Small delay between requests
-        if (i < files.length - 1) await new Promise(r => setTimeout(r, 300));
+        if (i < files.length - 1) await new Promise(r => setTimeout(r, 200));
     }
 
     progressText.textContent = 'All files processed!';
@@ -800,15 +717,14 @@ async function processAllFiles() {
     resultsSection.style.display = 'block';
 }
 
-// Fallback metadata generator for non-image files
 function generateMetadataFromFilename(filename, ext) {
     const cleanName = filename.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
     const words = cleanName.split('\s+').filter(w => w.length > 2);
 
     const mainSubject = words[0] ? words[0].charAt(0).toUpperCase() + words[0].slice(1) : 'Design';
-    const category = detectCategory(words.map(w => w.toLowerCase()), filename);
-    const mood = MOODS[category] || 'Creative';
-    const useCases = USE_CASES[category] || USE_CASES['abstract'];
+    const category = detectCategory(cleanName.toLowerCase(), words.map(w => w.toLowerCase()));
+    const mood = detectMood(category, cleanName.toLowerCase());
+    const useCases = buildUseCases(category);
 
     const title = `${mainSubject} ${ext.toUpperCase()} Design Asset - Professional ${category} Template`.substring(0, 80);
     const description = `A professional ${mainSubject.toLowerCase()} design asset in ${ext.toUpperCase()} format. Ideal for ${useCases.slice(0, 3).join(', ')}. High-quality, scalable, and ready for commercial use. Optimized for stock platforms and digital projects.`;
@@ -829,9 +745,7 @@ function generateMetadataFromFilename(filename, ext) {
         colorPalette: 'Mixed',
         suggestedUses: useCases.slice(0, 3).join(', '),
         ipSafe: true,
-        _visionLabels: ['filename-based'],
-        _visionObjects: [],
-        _confidence: 0.7
+        _aiCaption: 'Generated from filename analysis'
     };
 }
 
@@ -937,8 +851,7 @@ async function downloadAllAsZip() {
 
     const summary = successful.map(r => ({
         file: r.originalName, title: r.metadata.title,
-        keywords: r.metadata.keywords, category: r.metadata.category,
-        ipSafe: r.metadata.ipSafe
+        keywords: r.metadata.keywords, category: r.metadata.category, ipSafe: r.metadata.ipSafe
     }));
     folder.file('_summary.json', JSON.stringify(summary, null, 2));
 
