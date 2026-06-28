@@ -4,67 +4,124 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Metadata Injector</title>
-    <link rel="stylesheet" href="styles.css">
-    <!-- Fallback: if styles.css fails to load, inline critical styles -->
     <style>
-        /* Critical fallback styles */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #fafafa; color: #2c3e50; line-height: 1.6; min-height: 100vh; }
+        :root {
+            --primary: #e74c3c;
+            --primary-dark: #c0392b;
+            --primary-light: #fdf2f2;
+            --bg: #fafafa;
+            --card-bg: #ffffff;
+            --text: #2c3e50;
+            --text-light: #7f8c8d;
+            --border: #e8e8e8;
+            --success: #27ae60;
+            --error: #e74c3c;
+            --shadow: 0 2px 12px rgba(0,0,0,0.06);
+            --shadow-hover: 0 4px 20px rgba(231,76,60,0.12);
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
         .app { max-width: 720px; margin: 0 auto; padding: 24px 16px; }
         .header { text-align: center; padding: 32px 0 24px; }
         .logo { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 8px; }
-        .logo h1 { font-size: 1.6rem; font-weight: 700; color: #2c3e50; letter-spacing: -0.5px; }
-        .tagline { color: #7f8c8d; font-size: 0.95rem; }
-        .card { background: #ffffff; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); padding: 24px; margin-bottom: 16px; border: 1px solid #e8e8e8; }
+        .logo h1 { font-size: 1.6rem; font-weight: 700; color: var(--text); letter-spacing: -0.5px; }
+        .tagline { color: var(--text-light); font-size: 0.95rem; }
+        .card {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 24px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border);
+            transition: box-shadow 0.2s;
+        }
+        .card:hover { box-shadow: var(--shadow-hover); }
         .section-title { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
         .section-title h2 { font-size: 1.15rem; font-weight: 600; }
-        .hint { font-size: 0.82rem; color: #7f8c8d; margin-bottom: 12px; }
+        .hint { font-size: 0.82rem; color: var(--text-light); margin-bottom: 12px; }
         .input-group { display: flex; gap: 8px; }
-        .input-group input { flex: 1; padding: 12px 14px; border: 2px solid #e8e8e8; border-radius: 8px; font-size: 0.9rem; background: #fafafa; }
-        .input-group input:focus { outline: none; border-color: #e74c3c; }
-        .btn-icon { background: none; border: none; font-size: 1.2rem; cursor: pointer; padding: 8px; border-radius: 8px; }
+        .input-group input {
+            flex: 1; padding: 12px 14px; border: 2px solid var(--border);
+            border-radius: var(--radius-sm); font-size: 0.9rem; background: var(--bg);
+        }
+        .input-group input:focus { outline: none; border-color: var(--primary); }
+        .btn-icon {
+            background: none; border: none; font-size: 1.2rem; cursor: pointer;
+            padding: 8px; border-radius: var(--radius-sm);
+        }
+        .btn-icon:hover { background: var(--primary-light); }
         .api-status { margin-top: 10px; font-size: 0.85rem; min-height: 20px; }
-        .api-status.ok { color: #27ae60; }
-        .api-status.error { color: #e74c3c; }
-        .dropzone { border: 2px dashed #e8e8e8; border-radius: 12px; padding: 40px 20px; text-align: center; cursor: pointer; position: relative; background: #fafafa; }
-        .dropzone:hover, .dropzone.dragover { border-color: #e74c3c; background: #fdf2f2; }
+        .api-status.ok { color: var(--success); }
+        .api-status.error { color: var(--error); }
+        .api-status.warn { color: var(--warning); }
+        .dropzone {
+            border: 2px dashed var(--border); border-radius: var(--radius);
+            padding: 40px 20px; text-align: center; cursor: pointer;
+            position: relative; background: var(--bg); transition: all 0.25s;
+        }
+        .dropzone:hover, .dropzone.dragover {
+            border-color: var(--primary); background: var(--primary-light);
+        }
         .dropzone-content .drop-icon { font-size: 2.5rem; display: block; margin-bottom: 12px; }
-        .dropzone-content p { color: #2c3e50; font-size: 1rem; margin-bottom: 6px; }
-        .dropzone-content .formats { font-size: 0.8rem; color: #7f8c8d; }
+        .dropzone-content p { color: var(--text); font-size: 1rem; margin-bottom: 6px; }
+        .dropzone-content .formats { font-size: 0.8rem; color: var(--text-light); }
         .dropzone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
         .file-list { max-height: 320px; overflow-y: auto; margin-bottom: 16px; }
-        .file-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 8px; background: #fafafa; margin-bottom: 8px; border: 1px solid #e8e8e8; }
+        .file-item {
+            display: flex; align-items: center; gap: 12px; padding: 12px;
+            border-radius: var(--radius-sm); background: var(--bg);
+            margin-bottom: 8px; border: 1px solid var(--border);
+        }
         .file-item .file-icon { font-size: 1.5rem; width: 40px; text-align: center; }
         .file-item .file-info { flex: 1; min-width: 0; }
         .file-item .file-name { font-weight: 500; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .file-item .file-size { font-size: 0.78rem; color: #7f8c8d; }
-        .file-item .file-remove { background: none; border: none; color: #e74c3c; font-size: 1.2rem; cursor: pointer; padding: 4px 8px; border-radius: 4px; }
+        .file-item .file-size { font-size: 0.78rem; color: var(--text-light); }
+        .file-item .file-remove {
+            background: none; border: none; color: var(--error); font-size: 1.2rem;
+            cursor: pointer; padding: 4px 8px; border-radius: 4px;
+        }
+        .file-item .file-remove:hover { background: #fdeaea; }
         .batch-actions { display: flex; gap: 12px; flex-wrap: wrap; }
-        .btn-primary, .btn-secondary { padding: 12px 24px; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 8px; }
-        .btn-primary { background: #e74c3c; color: white; box-shadow: 0 2px 8px rgba(231,76,60,0.3); }
-        .btn-primary:hover { background: #c0392b; }
-        .btn-secondary { background: #fafafa; color: #2c3e50; border: 1px solid #e8e8e8; }
+        .btn-primary, .btn-secondary {
+            padding: 12px 24px; border-radius: var(--radius-sm); font-size: 0.95rem;
+            font-weight: 600; cursor: pointer; border: none;
+            display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s;
+        }
+        .btn-primary { background: var(--primary); color: white; box-shadow: 0 2px 8px rgba(231,76,60,0.3); }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
         .progress-container { margin-bottom: 16px; }
-        .progress-bar { width: 100%; height: 10px; background: #e8e8e8; border-radius: 5px; overflow: hidden; margin-bottom: 10px; }
-        .progress-fill { height: 100%; background: linear-gradient(90deg, #e74c3c, #ff6b6b); border-radius: 5px; transition: width 0.4s ease; width: 0%; }
-        .progress-text { font-size: 0.9rem; color: #7f8c8d; text-align: center; }
-        .processing-log { max-height: 200px; overflow-y: auto; background: #fafafa; border-radius: 8px; padding: 12px; font-size: 0.82rem; font-family: monospace; color: #7f8c8d; border: 1px solid #e8e8e8; }
-        .processing-log .log-success { color: #27ae60; }
-        .processing-log .log-error { color: #e74c3c; }
-        .processing-log .log-info { color: #e74c3c; }
-        .result-item { background: #fafafa; border-radius: 8px; padding: 16px; margin-bottom: 12px; border: 1px solid #e8e8e8; }
+        .progress-bar { width: 100%; height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; margin-bottom: 10px; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), #ff6b6b); border-radius: 5px; transition: width 0.4s ease; width: 0%; }
+        .progress-text { font-size: 0.9rem; color: var(--text-light); text-align: center; }
+        .processing-log { max-height: 200px; overflow-y: auto; background: var(--bg); border-radius: var(--radius-sm); padding: 12px; font-size: 0.82rem; font-family: monospace; color: var(--text-light); border: 1px solid var(--border); }
+        .processing-log .log-success { color: var(--success); }
+        .processing-log .log-error { color: var(--error); }
+        .processing-log .log-info { color: var(--primary); }
+        .result-item { background: var(--bg); border-radius: var(--radius-sm); padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); }
         .result-item .result-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
         .result-item .result-name { font-weight: 600; font-size: 0.9rem; flex: 1; }
-        .result-item .result-type { font-size: 0.75rem; padding: 3px 10px; border-radius: 20px; background: #fdf2f2; color: #e74c3c; font-weight: 600; }
-        .result-item .meta-preview { background: white; border-radius: 8px; padding: 12px; margin-bottom: 10px; border: 1px solid #e8e8e8; }
+        .result-item .result-type { font-size: 0.75rem; padding: 3px 10px; border-radius: 20px; background: var(--primary-light); color: var(--primary); font-weight: 600; }
+        .result-item .meta-preview { background: white; border-radius: var(--radius-sm); padding: 12px; margin-bottom: 10px; border: 1px solid var(--border); }
         .result-item .meta-row { display: flex; gap: 8px; margin-bottom: 6px; font-size: 0.82rem; }
-        .result-item .meta-label { font-weight: 600; color: #e74c3c; min-width: 80px; }
-        .result-item .meta-value { color: #2c3e50; flex: 1; word-break: break-word; }
+        .result-item .meta-label { font-weight: 600; color: var(--primary); min-width: 80px; }
+        .result-item .meta-value { color: var(--text); flex: 1; word-break: break-word; }
         .result-item .result-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-        .result-item .result-actions button { padding: 8px 16px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; border: none; }
-        .result-item .result-actions .btn-download { background: #e74c3c; color: white; }
-        .result-item .result-actions .btn-meta { background: #fafafa; color: #2c3e50; border: 1px solid #e8e8e8; }
-        .footer { text-align: center; padding: 20px 0; color: #7f8c8d; font-size: 0.8rem; }
+        .result-item .result-actions button { padding: 8px 16px; border-radius: var(--radius-sm); font-size: 0.82rem; font-weight: 600; cursor: pointer; border: none; }
+        .result-item .result-actions .btn-download { background: var(--primary); color: white; }
+        .result-item .result-actions .btn-meta { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+        .footer { text-align: center; padding: 20px 0; color: var(--text-light); font-size: 0.8rem; }
+        .info-box { background: #fff8e1; border: 1px solid #ffe082; border-radius: var(--radius-sm); padding: 12px; margin-bottom: 12px; font-size: 0.85rem; color: #f57f17; }
+        .info-box a { color: var(--primary); text-decoration: underline; }
         @media (max-width: 480px) { .app { padding: 12px; } .logo h1 { font-size: 1.3rem; } .card { padding: 16px; } .batch-actions { flex-direction: column; } .btn-primary, .btn-secondary { width: 100%; justify-content: center; } }
     </style>
 </head>
@@ -84,11 +141,15 @@
         <section class="card api-section">
             <div class="section-title">
                 <span>🔑</span>
-                <h2>Gemini API Key</h2>
+                <h2>Google Cloud Vision API Key</h2>
+            </div>
+            <div class="info-box">
+                <strong>Free forever:</strong> 1,000 image analyses per month.<br>
+                Get your key: <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console → APIs & Services → Credentials</a> (Create API Key, then enable Cloud Vision API)
             </div>
             <p class="hint">Your key stays in your browser. Never sent to any server.</p>
             <div class="input-group">
-                <input type="password" id="apiKey" placeholder="Paste your Gemini API key here..." autocomplete="off">
+                <input type="password" id="apiKey" placeholder="Paste your Google Cloud Vision API key here..." autocomplete="off">
                 <button id="toggleKey" class="btn-icon" title="Show/Hide">👁️</button>
             </div>
             <div class="api-status" id="apiStatus"></div>
@@ -124,7 +185,7 @@
         <section class="card processing-section" id="processingSection" style="display:none;">
             <div class="section-title">
                 <span>🤖</span>
-                <h2>Processing with Gemini AI</h2>
+                <h2>Processing with Google Vision AI</h2>
             </div>
             <div class="progress-container">
                 <div class="progress-bar" id="progressBar">
